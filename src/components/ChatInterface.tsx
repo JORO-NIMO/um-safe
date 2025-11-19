@@ -2,7 +2,19 @@ import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ArrowLeft, Send } from 'lucide-react';
+import { ArrowLeft, Send, LogOut, Settings } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/components/ui/use-toast';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -11,18 +23,33 @@ interface Message {
 
 interface ChatInterfaceProps {
   onBack: () => void;
+  userLanguage: string;
+  onSignOut: () => void;
 }
 
-export default function ChatInterface({ onBack }: ChatInterfaceProps) {
+const LANGUAGES = [
+  { value: 'en', label: 'English' },
+  { value: 'lug', label: 'Luganda' },
+  { value: 'ach', label: 'Acholi' },
+  { value: 'teo', label: 'Ateso' },
+  { value: 'lgg', label: 'Lugbara' },
+  { value: 'nyn', label: 'Runyankole' },
+];
+
+export default function ChatInterface({ onBack, userLanguage, onSignOut }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
-      content: 'Oli otya! Hello! I am UM-SAFE, your safe migration assistant. How can I help you today?'
+      content: userLanguage === 'en' 
+        ? 'Hello! I am UM-SAFE, your safe migration assistant. How can I help you today?'
+        : 'Oli otya! I am UM-SAFE. How can I help you?'
     }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [language, setLanguage] = useState(userLanguage);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -30,16 +57,74 @@ export default function ChatInterface({ onBack }: ChatInterfaceProps) {
     }
   }, [messages]);
 
+  useEffect(() => {
+    loadChatHistory();
+  }, []);
+
+  const loadChatHistory = async () => {
+    const { data, error } = await supabase
+      .from('chat_messages')
+      .select('*')
+      .order('created_at', { ascending: true })
+      .limit(50);
+
+    if (error) {
+      console.error('Error loading chat history:', error);
+      return;
+    }
+
+    if (data && data.length > 0) {
+      const historicalMessages = data.map(msg => ({
+        role: msg.role as 'user' | 'assistant',
+        content: msg.content
+      }));
+      setMessages([...historicalMessages]);
+    }
+  };
+
+  const handleLanguageChange = async (newLang: string) => {
+    setLanguage(newLang);
+    
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { error } = await supabase
+        .from('profiles')
+        .upsert({ user_id: user.id, preferred_language: newLang });
+      
+      if (error) {
+        console.error('Error updating language:', error);
+        toast({
+          title: "Error",
+          description: "Failed to update language preference",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Language Updated",
+          description: `Language changed to ${LANGUAGES.find(l => l.value === newLang)?.label}`,
+        });
+      }
+    }
+  };
+
   const streamChat = async (userMessage: string) => {
     const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (!session) {
+      throw new Error('Not authenticated');
+    }
     
     const resp = await fetch(CHAT_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        Authorization: `Bearer ${session.access_token}`,
       },
-      body: JSON.stringify({ messages: [...messages, { role: 'user', content: userMessage }] }),
+      body: JSON.stringify({ 
+        messages: [...messages, { role: 'user', content: userMessage }],
+        language
+      }),
     });
 
     if (!resp.ok || !resp.body) {
@@ -111,6 +196,11 @@ export default function ChatInterface({ onBack }: ChatInterfaceProps) {
       await streamChat(userMsg);
     } catch (error) {
       console.error('Chat error:', error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "An error occurred",
+        variant: "destructive",
+      });
       setMessages(prev => [...prev, { 
         role: 'assistant', 
         content: 'Sorry, I encountered an error. Please try again.' 
@@ -123,18 +213,64 @@ export default function ChatInterface({ onBack }: ChatInterfaceProps) {
   return (
     <div className="min-h-screen bg-hero-gradient flex flex-col">
       <div className="bg-card/80 backdrop-blur-sm border-b border-border">
-        <div className="container max-w-3xl mx-auto px-4 py-4 flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={onBack}
-            className="text-foreground hover:bg-card"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <h1 className="text-xl font-bold text-foreground">UM-SAFE Assistant</h1>
-            <p className="text-sm text-muted-foreground">Omuyambi wo mu Safari</p>
+        <div className="container max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onBack}
+              className="text-foreground hover:bg-card"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <h1 className="text-xl font-bold text-foreground">UM-SAFE Assistant</h1>
+              <p className="text-sm text-muted-foreground">Omuyambi wo mu Safari</p>
+            </div>
+          </div>
+          
+          <div className="flex gap-2">
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <Settings className="h-5 w-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent>
+                <SheetHeader>
+                  <SheetTitle>Settings</SheetTitle>
+                  <SheetDescription>
+                    Customize your preferences
+                  </SheetDescription>
+                </SheetHeader>
+                <div className="space-y-4 mt-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="language-setting">Language / Olulimi</Label>
+                    <Select value={language} onValueChange={handleLanguageChange}>
+                      <SelectTrigger id="language-setting">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {LANGUAGES.map((lang) => (
+                          <SelectItem key={lang.value} value={lang.value}>
+                            {lang.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </SheetContent>
+            </Sheet>
+            
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onSignOut}
+              title="Sign Out"
+            >
+              <LogOut className="h-5 w-5" />
+            </Button>
           </div>
         </div>
       </div>
