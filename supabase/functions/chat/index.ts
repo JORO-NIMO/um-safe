@@ -34,7 +34,8 @@ serve(async (req) => {
 
     // Switch to Hugging Face Inference API
     const HF_API_KEY = Deno.env.get('SUPABASE_HF_API_KEY');
-    const HF_MODEL = Deno.env.get('SUPABASE_HF_MODEL') || 'mistralai/Mistral-7B-Instruct-v0.3';
+    // Default now points to Llama 2 instruct; user can override via SUPABASE_HF_MODEL
+    const HF_MODEL = Deno.env.get('SUPABASE_HF_MODEL') || 'meta-llama/Llama-2-7b-hf';
     if (!HF_API_KEY) {
       throw new Error('Missing SUPABASE_HF_API_KEY environment variable');
     }
@@ -338,8 +339,22 @@ Remember: You have access to REAL, UP-TO-DATE information in the knowledge base 
       });
     }
 
-    // Build a conversation string for instruct-style models
-    const conversationPayload = translatedMessages.map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`).join('\n') + '\nAssistant:';
+    // Helper to format conversation for Llama 2 style with system prompt.
+    // Llama 2 expects: [INST] <<SYS>> system <<SYS>> user [/INST]
+    const buildLlama2Prompt = (system: string, msgs: any[]) => {
+      // Collect only user/assistant turns; merge consecutive assistant turns.
+      const turns: string[] = [];
+      for (const m of msgs) {
+        if (m.role === 'user') {
+          turns.push(`[INST] ${m.content} [/INST]`);
+        } else if (m.role === 'assistant') {
+          turns.push(m.content);
+        }
+      }
+      return `[INST] <<SYS>>\n${system}\n<<SYS>>\n[/INST]\n` + turns.join('\n') + `\n[INST]`; // Open last user turn for generation if needed.
+    };
+
+    const conversationPayload = buildLlama2Prompt(systemPrompt, translatedMessages);
 
     const hfResponse = await fetch(`https://api-inference.huggingface.co/models/${HF_MODEL}`, {
       method: 'POST',
@@ -374,8 +389,10 @@ Remember: You have access to REAL, UP-TO-DATE information in the knowledge base 
     } else if (hfData.generated_text) {
       assistantText = hfData.generated_text;
     } else if (hfData?.choices?.[0]?.text) {
-      assistantText = hfData.choices[0].text; // fallback pattern
+      assistantText = hfData.choices[0].text;
     }
+    // Strip any leftover prompt artifacts like leading [INST]
+    assistantText = assistantText.replace(/^\s*\[INST\]/, '').replace(/<<SYS>>[\s\S]*<<SYS>>/,'').trim();
     assistantText = assistantText.trim();
     if (!assistantText) assistantText = 'I am sorry, I could not generate a response.';
 
