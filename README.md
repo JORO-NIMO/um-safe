@@ -175,7 +175,7 @@ SUPABASE_PROJECT_REF=<project-ref>
 Trigger manually from Actions tab to deploy functions without local CLI.
 
 ### 6. Daily Incident Ingestion
-Workflow: `.github/workflows/fetch_incidents.yml` runs daily (cron) and appends new rows to `incident_reports_transformed.csv` using free GDELT API.
+Workflow: `.github/workflows/fetch_incidents.yml` runs daily (cron) and appends new rows to `incident_reports_transformed.csv` using free GDELT API. Query terms are stored in `gdelt_queries.txt` for easy editing.
 
 ### 7. Post-Deployment Checklist
 ```
@@ -189,7 +189,7 @@ Workflow: `.github/workflows/fetch_incidents.yml` runs daily (cron) and appends 
 ```
 
 ### 8. Optional Hardening
-- Enable JWT verification on `fetch_incidents` by setting `verify_jwt = true` in its `config.toml`.
+- JWT verification already enabled for `fetch_incidents` (requires authenticated Supabase session tokens when calling the endpoint).
 - Add rate limiting table (track IP / user_id + timestamp).
 - Add Sentry or similar for frontend error monitoring.
 - Add RLS policies for any new tables created.

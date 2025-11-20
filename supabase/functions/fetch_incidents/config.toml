@@ -1,0 +1,2 @@
+[functions.fetch_incidents]
+verify_jwt = true
