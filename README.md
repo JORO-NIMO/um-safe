@@ -125,13 +125,96 @@ um-safe/
 
 ## 🌐 Deployment
 
-The application can be deployed to any static hosting service:
-- Vercel
-- Netlify
-- GitHub Pages
-- Supabase Hosting
+UM-SAFE consists of a static frontend plus Supabase database + edge functions.
 
-Ensure your Supabase edge functions are deployed before deploying the frontend.
+### 1. Supabase Setup
+Run migrations (in order) via Supabase SQL Editor:
+```
+supabase/migrations/20251119140000_knowledge_base.sql
+supabase/migrations/20251120000000_verified_recruiters_data.sql
+```
+Deploy edge functions:
+- `chat` (AI conversation)
+- `fetch_incidents` (optional news ingestion trigger)
+
+Dashboard path: Edge Functions → New Function → Name matches folder → paste `index.ts` → Deploy. Add secrets for `fetch_incidents`:
+```
+SUPABASE_URL=https://<your-ref>.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=<service-role-key>
+```
+Never expose service role key in frontend.
+
+### 2. Environment Variables (Frontend Hosting)
+Set in hosting provider (Vercel / Netlify):
+```
+VITE_SUPABASE_URL=https://<your-ref>.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=<anon-public-key>
+VITE_SUPABASE_PROJECT_ID=<project-ref>
+```
+
+### 3. Build Frontend
+```
+npm install
+npm run build
+```
+`dist/` is the deployable artifact.
+
+### 4. Hosting Options
+- **Vercel (Recommended)**: `vercel --prod` (auto-detects Vite)
+- **Netlify**: Deploy `dist/` with build command `npm run build`
+- **GitHub Pages**: Push `dist/` to `gh-pages` branch (e.g. `npx gh-pages -d dist`)
+- **Static S3 + CloudFront**: Upload `dist/` contents and set proper caching headers
+
+### 5. Automated Function Deployment (CI)
+GitHub Actions workflow added: `.github/workflows/deploy_supabase_functions.yml`
+Add repository secrets:
+```
+SUPABASE_ACCESS_TOKEN=<personal-access-token>
+SUPABASE_PROJECT_REF=<project-ref>
+```
+Trigger manually from Actions tab to deploy functions without local CLI.
+
+### 6. Daily Incident Ingestion
+Workflow: `.github/workflows/fetch_incidents.yml` runs daily (cron) and appends new rows to `incident_reports_transformed.csv` using free GDELT API.
+
+### 7. Post-Deployment Checklist
+```
+✅ Migrations applied
+✅ Edge functions deployed (chat, fetch_incidents if needed)
+✅ Frontend reachable
+✅ Auth sign-up / login works
+✅ Chat responses stream
+✅ Incident ingestion cron running (see Actions)
+✅ No service role key in client bundle
+```
+
+### 8. Optional Hardening
+- Enable JWT verification on `fetch_incidents` by setting `verify_jwt = true` in its `config.toml`.
+- Add rate limiting table (track IP / user_id + timestamp).
+- Add Sentry or similar for frontend error monitoring.
+- Add RLS policies for any new tables created.
+
+### 9. Manual Invocation Examples
+Fetch incidents (no insert):
+```
+GET https://<project-ref>.functions.supabase.co/fetch_incidents?max=5
+```
+Insert (requires service role secret configured in function environment):
+```
+GET https://<project-ref>.functions.supabase.co/fetch_incidents?insert=true&max=5
+```
+
+### 10. Local Supabase CLI (Optional)
+If you prefer CLI locally and install methods fail, download binary from releases:
+```
+https://github.com/supabase/cli/releases
+```
+Place `supabase.exe` in a folder on `PATH` and use:
+```
+supabase login
+supabase link --project-ref <project-ref>
+supabase functions deploy chat
+```
 
 ## 📄 License
 
