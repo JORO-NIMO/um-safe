@@ -17,7 +17,7 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet';
 import KnowledgeBasePanel from '@/components/KnowledgeBasePanel';
-import { translateText } from '@/lib/translation';
+import { translateWithMeta, translateText } from '@/lib/translation';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -62,11 +62,20 @@ export default function ChatInterface({ onBack, userLanguage, onSignOut }: ChatI
     translateInitialGreeting();
   }, []);
 
+  const [noticeShown, setNoticeShown] = useState(false);
+
   const translateInitialGreeting = async () => {
     if (language !== 'en') {
       try {
-        const translated = await translateText(initialEnglishGreeting, language);
-        setMessages(prev => prev.map((m, i) => i === 0 ? { ...m, content: translated } : m));
+        const meta = await translateWithMeta(initialEnglishGreeting, language);
+        setMessages(prev => prev.map((m, i) => i === 0 ? { ...m, content: meta.text } : m));
+        if (!meta.translated && !noticeShown) {
+          toast({
+            title: 'Translation Unavailable',
+            description: 'This language is not yet supported. Showing English for now.',
+          });
+          setNoticeShown(true);
+        }
       } catch (e) {
         console.warn('Initial greeting translation failed.', e);
       }
@@ -131,8 +140,15 @@ export default function ChatInterface({ onBack, userLanguage, onSignOut }: ChatI
     let internalUserMessage = userMessage;
     if (language !== 'en') {
       try {
-        const translatedOutbound = await translateText(userMessage, 'en');
-        internalUserMessage = translatedOutbound || userMessage;
+        const metaOut = await translateWithMeta(userMessage, 'en');
+        internalUserMessage = metaOut.text || userMessage;
+        if (!metaOut.translated && !noticeShown) {
+          toast({
+            title: 'Translation Unavailable',
+            description: 'Cannot translate outgoing message. Sending original language.',
+          });
+          setNoticeShown(true);
+        }
       } catch { /* fallback to original */ }
     }
 
@@ -207,9 +223,15 @@ export default function ChatInterface({ onBack, userLanguage, onSignOut }: ChatI
     // Post-translation step (only once stream finishes)
     if (assistantContent && language !== 'en') {
       try {
-        const translated = await translateText(assistantContent, language);
-        if (translated) {
-          setMessages(prev => prev.map((m, i) => i === prev.length - 1 ? { ...m, content: translated } : m));
+        const metaIn = await translateWithMeta(assistantContent, language);
+        if (metaIn.translated) {
+          setMessages(prev => prev.map((m, i) => i === prev.length - 1 ? { ...m, content: metaIn.text } : m));
+        } else if (!noticeShown) {
+          toast({
+            title: 'Translation Unavailable',
+            description: 'Assistant response shown in English due to limited language support.',
+          });
+          setNoticeShown(true);
         }
       } catch (e) {
         console.warn('Translation failed, showing original content.', e);

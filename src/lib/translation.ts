@@ -86,25 +86,87 @@ function buildProviderOrder(): ProviderFn[] {
 const providers = buildProviderOrder();
 
 export async function translateText(text: string, targetLang: string): Promise<string> {
+  const meta = await translateWithMeta(text, targetLang);
+  return meta.text;
+}
+
+export interface TranslationMeta {
+  text: string;              // final text (translated or original)
+  translated: boolean;       // whether translation happened
+  provider?: string;         // provider that succeeded
+  targetLang: string;        // requested target language
+  normalizedTarget: string;  // normalized provider language code
+  attempts: number;          // number of provider attempts
+  failedProviders: string[]; // provider names that failed
+}
+
+export async function translateWithMeta(text: string, targetLang: string): Promise<TranslationMeta> {
   const normalized = normalizeTarget(targetLang);
-  if (!text || normalized === 'en') return text; // No translation needed.
+  const failedProviders: string[] = [];
+  if (!text || normalized === 'en') {
+    return {
+      text,
+      translated: false,
+      provider: undefined,
+      targetLang,
+      normalizedTarget: normalized,
+      attempts: 0,
+      failedProviders
+    };
+  }
 
   const cacheKey = `${normalized}:${text}`;
-  if (cache.has(cacheKey)) return cache.get(cacheKey)!;
+  if (cache.has(cacheKey)) {
+    return {
+      text: cache.get(cacheKey)!,
+      translated: true,
+      provider: 'cache',
+      targetLang,
+      normalizedTarget: normalized,
+      attempts: 0,
+      failedProviders
+    };
+  }
 
+  let attempts = 0;
   for (const provider of providers) {
+    attempts++;
     try {
       const result = await provider(text, normalized);
       if (result && typeof result === 'string' && result.trim()) {
         cache.set(cacheKey, result);
-        return result;
+        return {
+          text: result,
+          translated: true,
+          provider: provider.name || 'anonymous-provider',
+          targetLang,
+          normalizedTarget: normalized,
+          attempts,
+          failedProviders
+        };
+      } else {
+        failedProviders.push(provider.name || 'unknown');
       }
-    } catch {
-      // Ignore and continue
+    } catch (e) {
+      failedProviders.push(provider.name || 'unknown');
+      if (import.meta.env.DEV && import.meta.env.VITE_TRANSLATION_LOG === 'verbose') {
+        console.warn('[translation] provider failure', provider.name, e);
+      }
     }
   }
-  // Fallback: return original if no provider succeeded.
-  return text;
+
+  if (import.meta.env.VITE_TRANSLATION_LOG) {
+    console.warn('[translation] all providers failed for', targetLang, 'normalized:', normalized, 'returning original text');
+  }
+  return {
+    text,
+    translated: false,
+    provider: undefined,
+    targetLang,
+    normalizedTarget: normalized,
+    attempts,
+    failedProviders
+  };
 }
 
 export function clearTranslationCache() {
