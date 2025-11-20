@@ -103,5 +103,25 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+    /* Two image layers: gradient overlay + actual bg.png with a tiny 1x1 fallback data URI */
+    background-image:
+      linear-gradient(to bottom right, hsla(var(--gradient-start)/0.75), hsla(var(--gradient-end)/0.75)),
+      url('/bg.png'),
+      url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=');
+    background-size: cover, cover, 1px 1px;
+    background-position: center, center, left top;
+    background-attachment: fixed;
+    background-repeat: no-repeat, no-repeat, no-repeat;
   }
+}
+
+/* Hero gradient utility layering the background image with an overlay */
+.bg-hero-gradient {
+  background-image:
+    linear-gradient(to bottom right, hsla(var(--gradient-start)/0.85), hsla(var(--gradient-end)/0.85)),
+    url('/bg.png'),
+    url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=');
+  background-size: cover, cover, 1px 1px;
+  background-position: center, center, left top;
+  background-repeat: no-repeat, no-repeat, no-repeat;
 }

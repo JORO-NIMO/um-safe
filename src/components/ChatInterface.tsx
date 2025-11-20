@@ -17,6 +17,7 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet';
 import KnowledgeBasePanel from '@/components/KnowledgeBasePanel';
+import { translateText } from '@/lib/translation';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -39,14 +40,11 @@ const LANGUAGES = [
 ];
 
 export default function ChatInterface({ onBack, userLanguage, onSignOut }: ChatInterfaceProps) {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      role: 'assistant',
-      content: userLanguage === 'en' 
-        ? '👋 Hello! I am UM-SAFE, your safe migration assistant. I can help you with:\n\n✓ Recruiter verification\n✓ Understanding your rights\n✓ Emergency contacts\n✓ Travel safety tips\n\nHow can I assist you today?'
-        : '👋 Oli otya! I am UM-SAFE, your migration assistant. How can I help you today?'
-    }
-  ]);
+  const initialEnglishGreeting = '👋 Hello! I am UM-SAFE, your safe migration assistant. I can help you with:\n\n✓ Recruiter verification\n✓ Understanding your rights\n✓ Emergency contacts\n✓ Travel safety tips\n\nHow can I assist you today?';
+  const [messages, setMessages] = useState<Message[]>([{
+    role: 'assistant',
+    content: initialEnglishGreeting
+  }]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [language, setLanguage] = useState(userLanguage);
@@ -61,7 +59,19 @@ export default function ChatInterface({ onBack, userLanguage, onSignOut }: ChatI
 
   useEffect(() => {
     loadChatHistory();
+    translateInitialGreeting();
   }, []);
+
+  const translateInitialGreeting = async () => {
+    if (language !== 'en') {
+      try {
+        const translated = await translateText(initialEnglishGreeting, language);
+        setMessages(prev => prev.map((m, i) => i === 0 ? { ...m, content: translated } : m));
+      } catch (e) {
+        console.warn('Initial greeting translation failed.', e);
+      }
+    }
+  };
 
   const loadChatHistory = async () => {
     const { data, error } = await supabase
@@ -117,6 +127,15 @@ export default function ChatInterface({ onBack, userLanguage, onSignOut }: ChatI
       throw new Error('Not authenticated');
     }
     
+    // Translate outbound user message to English if needed (backend assumed English-centric)
+    let internalUserMessage = userMessage;
+    if (language !== 'en') {
+      try {
+        const translatedOutbound = await translateText(userMessage, 'en');
+        internalUserMessage = translatedOutbound || userMessage;
+      } catch { /* fallback to original */ }
+    }
+
     const resp = await fetch(CHAT_URL, {
       method: "POST",
       headers: {
@@ -124,7 +143,7 @@ export default function ChatInterface({ onBack, userLanguage, onSignOut }: ChatI
         Authorization: `Bearer ${session.access_token}`,
       },
       body: JSON.stringify({ 
-        messages: [...messages, { role: 'user', content: userMessage }],
+        messages: [...messages, { role: 'user', content: internalUserMessage }],
         language
       }),
     });
@@ -182,6 +201,18 @@ export default function ChatInterface({ onBack, userLanguage, onSignOut }: ChatI
           textBuffer = line + "\n" + textBuffer;
           break;
         }
+      }
+    }
+
+    // Post-translation step (only once stream finishes)
+    if (assistantContent && language !== 'en') {
+      try {
+        const translated = await translateText(assistantContent, language);
+        if (translated) {
+          setMessages(prev => prev.map((m, i) => i === prev.length - 1 ? { ...m, content: translated } : m));
+        }
+      } catch (e) {
+        console.warn('Translation failed, showing original content.', e);
       }
     }
   };
