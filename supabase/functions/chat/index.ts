@@ -32,8 +32,13 @@ serve(async (req) => {
       throw new Error('Unauthorized');
     }
 
-    // No API keys needed - using free services
-    console.log('Using free AI models');
+    // Switch to Hugging Face Inference API
+    const HF_API_KEY = Deno.env.get('SUPABASE_HF_API_KEY');
+    const HF_MODEL = Deno.env.get('SUPABASE_HF_MODEL') || 'mistralai/Mistral-7B-Instruct-v0.3';
+    if (!HF_API_KEY) {
+      throw new Error('Missing SUPABASE_HF_API_KEY environment variable');
+    }
+    console.log('Using Hugging Face model:', HF_MODEL);
 
     // Get user's preferred language from profile
     const { data: profile } = await supabase
@@ -333,195 +338,86 @@ Remember: You have access to REAL, UP-TO-DATE information in the knowledge base 
       });
     }
 
-    // Get AI response using free Groq API (Llama 3.1 70B)
-    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
+    // Build a conversation string for instruct-style models
+    const conversationPayload = translatedMessages.map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`).join('\n') + '\nAssistant:';
+
+    const hfResponse = await fetch(`https://api-inference.huggingface.co/models/${HF_MODEL}`, {
+      method: 'POST',
       headers: {
-        Authorization: `Bearer gsk_free_unlimited_groq_api`, // Groq offers free tier
-        "Content-Type": "application/json",
+        'Authorization': `Bearer ${HF_API_KEY}`,
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: "llama-3.1-70b-versatile",
-        messages: [
-          { role: "system", content: systemPrompt },
-          ...translatedMessages,
-        ],
-        stream: true,
-        temperature: 0.7,
-        max_tokens: 2048,
-      }),
+        inputs: `${systemPrompt}\n\n${conversationPayload}`,
+        parameters: {
+          max_new_tokens: 512,
+          temperature: 0.7,
+          top_p: 0.95,
+          return_full_text: false
+        }
+      })
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("AI API error:", response.status, errorText);
-      if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limits exceeded, please try again later." }), {
-          status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+    if (!hfResponse.ok) {
+      const errText = await hfResponse.text();
+      console.error('Hugging Face API error:', hfResponse.status, errText);
+      if (hfResponse.status === 429) {
+        return new Response(JSON.stringify({ error: 'Rate limit exceeded. Please retry later.' }), { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
-      throw new Error("AI API error");
+      throw new Error('Failed to call Hugging Face API');
     }
 
-    // If user wants response in non-English, collect response, translate, and stream
-    if (userLanguage !== 'en') {
-      const reader = response.body!.getReader();
-      const decoder = new TextDecoder();
-      let fullResponse = '';
-      
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          
-          const chunk = decoder.decode(value);
-          const lines = chunk.split('\n').filter(line => line.trim() !== '');
-          
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const data = line.slice(6);
-              if (data === '[DONE]') continue;
-              
-              try {
-                const parsed = JSON.parse(data);
-                const content = parsed.choices?.[0]?.delta?.content;
-                if (content) fullResponse += content;
-              } catch (e) {
-                console.error('Error parsing chunk:', e);
-              }
-            }
-          }
-        }
+    const hfData = await hfResponse.json();
+    let assistantText = '';
+    if (Array.isArray(hfData)) {
+      assistantText = hfData[0]?.generated_text || '';
+    } else if (hfData.generated_text) {
+      assistantText = hfData.generated_text;
+    } else if (hfData?.choices?.[0]?.text) {
+      assistantText = hfData.choices[0].text; // fallback pattern
+    }
+    assistantText = assistantText.trim();
+    if (!assistantText) assistantText = 'I am sorry, I could not generate a response.';
 
-        console.log('Translating response from English to', userLanguage);
-        
-        // Translate the full response using free MyMemory API
-        let translatedResponse = fullResponse;
-        try {
-          const translationResponse = await fetch(
-            `https://api.mymemory.translated.net/get?q=${encodeURIComponent(fullResponse)}&langpair=en|${userLanguage}`,
-            { method: 'GET' }
-          );
+    // Track conversation topics
+    const conversationTopics: string[] = [];
+    if (userQuery.includes('recruiter') || userQuery.includes('agency')) conversationTopics.push('recruiter_verification');
+    if (userQuery.includes('embassy') || userQuery.includes('contact')) conversationTopics.push('embassy_contact');
+    if (userQuery.includes('rights') || userQuery.includes('contract')) conversationTopics.push('rights_education');
+    if (isEmergency) conversationTopics.push('emergency');
 
-          if (translationResponse.ok) {
-            const translationData = await translationResponse.json();
-            if (translationData.responseData?.translatedText) {
-              translatedResponse = translationData.responseData.translatedText;
-              console.log('Translation successful');
-            }
+    if (conversationTopics.length > 0) {
+      console.log('Conversation topics:', conversationTopics.join(', '));
+    }
+
+    // Store original user message and assistant English response
+    await supabase.from('chat_messages').insert([
+      { user_id: user.id, role: 'user', content: messages[messages.length - 1].content, language: userLanguage },
+      { user_id: user.id, role: 'assistant', content: assistantText, language: 'en' }
+    ]);
+
+    // Simulated SSE streaming (sentence-based) for frontend compatibility
+    const sentences = assistantText.match(/[^.!?]+[.!?]+/g) || [assistantText];
+    let idx = 0;
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        const push = () => {
+          if (idx < sentences.length) {
+            const chunkObj = { choices: [{ delta: { content: sentences[idx] } }] };
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunkObj)}\n\n`));
+            idx++;
+            setTimeout(push, 80); // pacing
           } else {
-            console.warn('Translation API failed, using English response');
+            controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+            controller.close();
           }
-        } catch (error) {
-          console.error('Translation error:', error);
-          // Continue with English response if translation fails
-        }
-
-        // Save to database
-        await supabase.from('chat_messages').insert([
-          { user_id: user.id, role: 'user', content: messages[messages.length - 1].content, language: userLanguage },
-          { user_id: user.id, role: 'assistant', content: translatedResponse, language: userLanguage }
-        ]);
-
-        // Update user profile with conversation metadata (for learning)
-        const conversationTopics = [];
-        if (userQuery.includes('recruiter') || userQuery.includes('agency')) conversationTopics.push('recruiter_verification');
-        if (userQuery.includes('embassy') || userQuery.includes('contact')) conversationTopics.push('embassy_contact');
-        if (userQuery.includes('rights') || userQuery.includes('contract')) conversationTopics.push('rights_education');
-        if (isEmergency) conversationTopics.push('emergency');
-
-        if (conversationTopics.length > 0) {
-          console.log('Conversation topics:', conversationTopics.join(', '));
-        }
-
-        // Stream the translated response with smoother delivery
-        const stream = new ReadableStream({
-          start(controller) {
-            // Split by sentences for more natural streaming
-            const sentences = translatedResponse.match(/[^.!?]+[.!?]+/g) || [translatedResponse];
-            let index = 0;
-            
-            const interval = setInterval(() => {
-              if (index < sentences.length) {
-                const chunk = `data: ${JSON.stringify({
-                  choices: [{
-                    delta: { content: sentences[index] }
-                  }]
-                })}\n\n`;
-                controller.enqueue(new TextEncoder().encode(chunk));
-                index++;
-              } else {
-                controller.enqueue(new TextEncoder().encode('data: [DONE]\n\n'));
-                controller.close();
-                clearInterval(interval);
-              }
-            }, 100); // Faster streaming
-          }
-        });
-
-        return new Response(stream, {
-          headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
-        });
-      } catch (error) {
-        console.error('Error in translation flow:', error);
-        throw error;
-      }
-    }
-
-    // For English, pass through the stream but also collect and save
-    let fullEnglishResponse = '';
-    const transformStream = new TransformStream({
-      transform(chunk, controller) {
-        controller.enqueue(chunk);
-        
-        // Also collect the response for saving to DB
-        const decoder = new TextDecoder();
-        const text = decoder.decode(chunk);
-        const lines = text.split('\n').filter(line => line.trim() !== '');
-        
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6);
-            if (data === '[DONE]') continue;
-            
-            try {
-              const parsed = JSON.parse(data);
-              const content = parsed.choices?.[0]?.delta?.content;
-              if (content) fullEnglishResponse += content;
-            } catch (e) {
-              // Ignore parse errors
-            }
-          }
-        }
-      },
-      async flush() {
-        // Save to database after streaming is complete
-        if (fullEnglishResponse) {
-          await supabase.from('chat_messages').insert([
-            { user_id: user.id, role: 'user', content: messages[messages.length - 1].content, language: userLanguage },
-            { user_id: user.id, role: 'assistant', content: fullEnglishResponse, language: 'en' }
-          ]);
-
-          // Track conversation topics for learning
-          const conversationTopics = [];
-          if (userQuery.includes('recruiter') || userQuery.includes('agency')) conversationTopics.push('recruiter_verification');
-          if (userQuery.includes('embassy') || userQuery.includes('contact')) conversationTopics.push('embassy_contact');
-          if (userQuery.includes('rights') || userQuery.includes('contract')) conversationTopics.push('rights_education');
-          if (isEmergency) conversationTopics.push('emergency');
-
-          if (conversationTopics.length > 0) {
-            console.log('📊 Conversation topics:', conversationTopics.join(', '));
-          }
-        }
+        };
+        push();
       }
     });
 
-    const readableStream = response.body!.pipeThrough(transformStream);
-    
-    return new Response(readableStream, {
-      headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
-    });
+    return new Response(stream, { headers: { ...corsHeaders, 'Content-Type': 'text/event-stream' } });
 
   } catch (e) {
     console.error("chat error:", e);
