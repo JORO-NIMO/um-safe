@@ -41,6 +41,105 @@ export type Database = {
         }
         Relationships: []
       }
+      embassy_contacts: {
+        Row: {
+          id: string
+          country: string
+          embassy_name: string
+          phone_primary: string
+          phone_secondary: string | null
+          email: string | null
+          address: string | null
+          emergency_hotline: string | null
+          working_hours: string | null
+          website: string | null
+          notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          country: string
+          embassy_name: string
+          phone_primary: string
+          phone_secondary?: string | null
+          email?: string | null
+          address?: string | null
+          emergency_hotline?: string | null
+          working_hours?: string | null
+          website?: string | null
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          country?: string
+          embassy_name?: string
+          phone_primary?: string
+          phone_secondary?: string | null
+          email?: string | null
+          address?: string | null
+          emergency_hotline?: string | null
+          working_hours?: string | null
+          website?: string | null
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      incident_reports: {
+        Row: {
+          id: string
+          user_id: string
+          incident_type: string
+          severity: string
+          country: string | null
+          employer_name: string | null
+          description: string
+          status: string
+          embassy_contacted: boolean
+          police_contacted: boolean
+          follow_up_needed: boolean
+          notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          incident_type: string
+          severity: string
+          country?: string | null
+          employer_name?: string | null
+          description: string
+          status?: string
+          embassy_contacted?: boolean
+          police_contacted?: boolean
+          follow_up_needed?: boolean
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          incident_type?: string
+          severity?: string
+          country?: string | null
+          employer_name?: string | null
+          description?: string
+          status?: string
+          embassy_contacted?: boolean
+          police_contacted?: boolean
+          follow_up_needed?: boolean
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -62,6 +161,105 @@ export type Database = {
           preferred_language?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      recruiters: {
+        Row: {
+          id: string
+          company_name: string
+          license_number: string | null
+          registration_date: string | null
+          expiry_date: string | null
+          status: string
+          company_address: string | null
+          phone: string | null
+          email: string | null
+          website: string | null
+          verified_by: string | null
+          countries_of_operation: string[] | null
+          warnings: string[] | null
+          complaints_count: number
+          notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          company_name: string
+          license_number?: string | null
+          registration_date?: string | null
+          expiry_date?: string | null
+          status: string
+          company_address?: string | null
+          phone?: string | null
+          email?: string | null
+          website?: string | null
+          verified_by?: string | null
+          countries_of_operation?: string[] | null
+          warnings?: string[] | null
+          complaints_count?: number
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          company_name?: string
+          license_number?: string | null
+          registration_date?: string | null
+          expiry_date?: string | null
+          status?: string
+          company_address?: string | null
+          phone?: string | null
+          email?: string | null
+          website?: string | null
+          verified_by?: string | null
+          countries_of_operation?: string[] | null
+          warnings?: string[] | null
+          complaints_count?: number
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      rights_resources: {
+        Row: {
+          id: string
+          category: string
+          title: string
+          content: string
+          language: string
+          country_specific: string | null
+          tags: string[] | null
+          priority: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          category: string
+          title: string
+          content: string
+          language?: string
+          country_specific?: string | null
+          tags?: string[] | null
+          priority?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          category?: string
+          title?: string
+          content?: string
+          language?: string
+          country_specific?: string | null
+          tags?: string[] | null
+          priority?: number
+          created_at?: string
+          updated_at?: string
         }
         Relationships: []
       }

@@ -2,7 +2,8 @@ import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ArrowLeft, Send, LogOut, Settings } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { ArrowLeft, Send, LogOut, Settings, MessageSquare, Shield, BookOpen } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/components/ui/use-toast';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -15,6 +16,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from '@/components/ui/sheet';
+import KnowledgeBasePanel from '@/components/KnowledgeBasePanel';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -41,8 +43,8 @@ export default function ChatInterface({ onBack, userLanguage, onSignOut }: ChatI
     {
       role: 'assistant',
       content: userLanguage === 'en' 
-        ? 'Hello! I am UM-SAFE, your safe migration assistant. How can I help you today?'
-        : 'Oli otya! I am UM-SAFE. How can I help you?'
+        ? '👋 Hello! I am UM-SAFE, your safe migration assistant. I can help you with:\n\n✓ Recruiter verification\n✓ Understanding your rights\n✓ Emergency contacts\n✓ Travel safety tips\n\nHow can I assist you today?'
+        : '👋 Oli otya! I am UM-SAFE, your migration assistant. How can I help you today?'
     }
   ]);
   const [input, setInput] = useState('');
@@ -100,7 +102,7 @@ export default function ChatInterface({ onBack, userLanguage, onSignOut }: ChatI
         });
       } else {
         toast({
-          title: "Language Updated",
+          title: "Language Updated ✓",
           description: `Language changed to ${LANGUAGES.find(l => l.value === newLang)?.label}`,
         });
       }
@@ -203,7 +205,7 @@ export default function ChatInterface({ onBack, userLanguage, onSignOut }: ChatI
       });
       setMessages(prev => [...prev, { 
         role: 'assistant', 
-        content: 'Sorry, I encountered an error. Please try again.' 
+        content: '❌ Sorry, I encountered an error. Please try again or contact support if the issue persists.' 
       }]);
     } finally {
       setIsLoading(false);
@@ -212,27 +214,54 @@ export default function ChatInterface({ onBack, userLanguage, onSignOut }: ChatI
 
   return (
     <div className="min-h-screen bg-hero-gradient flex flex-col">
-      <div className="bg-card/80 backdrop-blur-sm border-b border-border">
-        <div className="container max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
+      <div className="bg-card/90 backdrop-blur-md border-b border-border shadow-md">
+        <div className="container max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Button
               variant="ghost"
               size="icon"
               onClick={onBack}
-              className="text-foreground hover:bg-card"
+              className="text-foreground hover:bg-card hover:scale-105 transition-transform"
             >
               <ArrowLeft className="h-5 w-5" />
             </Button>
-            <div>
-              <h1 className="text-xl font-bold text-foreground">UM-SAFE Assistant</h1>
-              <p className="text-sm text-muted-foreground">Omuyambi wo mu Safari</p>
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-primary/10 rounded-full">
+                <Shield className="h-6 w-6 text-primary" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
+                  UM-SAFE Assistant
+                  <Badge variant="secondary" className="text-xs">AI</Badge>
+                </h1>
+                <p className="text-sm text-muted-foreground">Omuyambi wo mu Safari</p>
+              </div>
             </div>
           </div>
           
           <div className="flex gap-2">
             <Sheet>
               <SheetTrigger asChild>
-                <Button variant="ghost" size="icon">
+                <Button variant="ghost" size="icon" className="hover:scale-105 transition-transform" title="Knowledge Base">
+                  <BookOpen className="h-5 w-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-full sm:max-w-2xl">
+                <SheetHeader>
+                  <SheetTitle>Knowledge Base</SheetTitle>
+                  <SheetDescription>
+                    Embassy contacts, verified recruiters, and safety resources
+                  </SheetDescription>
+                </SheetHeader>
+                <div className="mt-6">
+                  <KnowledgeBasePanel />
+                </div>
+              </SheetContent>
+            </Sheet>
+
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="hover:scale-105 transition-transform">
                   <Settings className="h-5 w-5" />
                 </Button>
               </SheetTrigger>
@@ -268,6 +297,7 @@ export default function ChatInterface({ onBack, userLanguage, onSignOut }: ChatI
               size="icon"
               onClick={onSignOut}
               title="Sign Out"
+              className="hover:scale-105 transition-transform hover:text-red-500"
             >
               <LogOut className="h-5 w-5" />
             </Button>
@@ -276,30 +306,39 @@ export default function ChatInterface({ onBack, userLanguage, onSignOut }: ChatI
       </div>
 
       <ScrollArea className="flex-1 p-4" ref={scrollRef}>
-        <div className="container max-w-3xl mx-auto space-y-4">
+        <div className="container max-w-4xl mx-auto space-y-4 pb-4">
           {messages.map((msg, idx) => (
             <div
               key={idx}
-              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-in slide-in-from-bottom-2 duration-300`}
             >
               <div
-                className={`max-w-[80%] rounded-lg px-4 py-3 ${
+                className={`max-w-[85%] md:max-w-[75%] rounded-2xl px-4 py-3 shadow-md ${
                   msg.role === 'user'
                     ? 'bg-primary text-primary-foreground'
                     : 'bg-card text-card-foreground border border-border'
                 }`}
               >
-                <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                {msg.role === 'assistant' && (
+                  <div className="flex items-center gap-2 mb-2 pb-2 border-b border-border/50">
+                    <MessageSquare className="h-4 w-4 text-primary" />
+                    <span className="text-xs font-medium text-muted-foreground">UM-SAFE Assistant</span>
+                  </div>
+                )}
+                <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.content}</p>
               </div>
             </div>
           ))}
           {isLoading && (
-            <div className="flex justify-start">
-              <div className="bg-card text-card-foreground border border-border rounded-lg px-4 py-3">
-                <div className="flex gap-1">
-                  <div className="w-2 h-2 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <div className="w-2 h-2 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <div className="w-2 h-2 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: '300ms' }} />
+            <div className="flex justify-start animate-in slide-in-from-bottom-2 duration-300">
+              <div className="bg-card text-card-foreground border border-border rounded-2xl px-4 py-3 shadow-md">
+                <div className="flex items-center gap-2">
+                  <div className="flex gap-1">
+                    <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <div className="w-2 h-2 rounded-full bg-primary animate-bounce" style={{ animationDelay: '300ms' }} />
+                  </div>
+                  <span className="text-xs text-muted-foreground">Typing...</span>
                 </div>
               </div>
             </div>
@@ -307,18 +346,23 @@ export default function ChatInterface({ onBack, userLanguage, onSignOut }: ChatI
         </div>
       </ScrollArea>
 
-      <div className="bg-card/80 backdrop-blur-sm border-t border-border p-4">
-        <div className="container max-w-3xl mx-auto">
+      <div className="bg-card/90 backdrop-blur-md border-t border-border shadow-lg p-4">
+        <div className="container max-w-4xl mx-auto">
           <div className="flex gap-2">
             <Input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-              placeholder="Type your message..."
+              onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
+              placeholder="Type your message... (Press Enter to send)"
               disabled={isLoading}
-              className="bg-background"
+              className="bg-background border-2 focus:border-primary transition-colors"
             />
-            <Button onClick={handleSend} disabled={isLoading || !input.trim()}>
+            <Button 
+              onClick={handleSend} 
+              disabled={isLoading || !input.trim()}
+              className="px-6 hover:scale-105 transition-transform"
+              size="lg"
+            >
               <Send className="h-4 w-4" />
             </Button>
           </div>

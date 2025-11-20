@@ -1,73 +1,150 @@
-# Welcome to your Lovable project
+# UM-SAFE - Uganda Migrant Safety Assistant
 
-## Project info
+## 🌍 About
 
-**URL**: https://lovable.dev/projects/8a6889a8-a8c3-4803-80ef-d430bee4a784
+UM-SAFE is an AI-powered multilingual assistant dedicated to protecting Ugandan migrant workers traveling to the Middle East. The platform provides:
 
-## How can I edit this code?
+- **Real-time AI Chatbot** with emergency detection
+- **Multilingual Support** - English + 5 Ugandan languages (Luganda, Acholi, Ateso, Lugbara, Runyankole)
+- **Recruiter Verification** - Check against 95+ government-verified agencies
+- **Embassy Contacts** - Direct access to Uganda embassies in UAE, Saudi Arabia, Qatar, Kuwait, Jordan
+- **Rights Education** - Know your rights as a migrant worker
+- **Emergency Response** - Automatic incident detection and reporting
 
-There are several ways of editing your application.
+## 🚀 Tech Stack
 
-**Use Lovable**
+- **Frontend**: React 18 + TypeScript + Vite
+- **UI Components**: shadcn/ui + Tailwind CSS
+- **Backend**: Supabase (PostgreSQL + Auth + Edge Functions)
+- **AI Model**: Groq API with Llama 3.1 70B (Free unlimited tier)
+- **Translation**: MyMemory Translation API (1000 free requests/day, no key needed)
+- **Authentication**: Supabase Auth with email/password
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/8a6889a8-a8c3-4803-80ef-d430bee4a784) and start prompting.
+## 📋 Prerequisites
 
-Changes made via Lovable will be committed automatically to this repo.
+- Node.js 18+ & npm
+- Supabase account
 
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
+## 🛠️ Installation
 
 ```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+# Clone the repository
+git clone https://github.com/JORO-NIMO/um-safe.git
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+# Navigate to project directory
+cd um-safe
 
-# Step 3: Install the necessary dependencies.
-npm i
+# Install dependencies
+npm install
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Start development server
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+## ⚙️ Configuration
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+1. **Update Environment Variables**
+   
+   Edit `.env` file with your Supabase credentials:
+   ```env
+   VITE_SUPABASE_PROJECT_ID="your-project-id"
+   VITE_SUPABASE_PUBLISHABLE_KEY="your-anon-key"
+   VITE_SUPABASE_URL="https://your-project.supabase.co"
+   ```
 
-**Use GitHub Codespaces**
+2. **Run Database Migrations**
+   
+   Go to your Supabase SQL Editor and run:
+   - `supabase/migrations/20251119140000_knowledge_base.sql`
+   - `supabase/migrations/20251120000000_verified_recruiters_data.sql`
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+3. **Deploy Edge Function**
+   
+   Deploy the chat function from `supabase/functions/chat/index.ts` to your Supabase project.
 
-## What technologies are used for this project?
+## 💡 Free & Open Source
 
-This project is built with:
+UM-SAFE uses completely free APIs with no API keys required:
+- **Groq AI**: Free tier with generous limits for Llama 3.1 70B model
+- **MyMemory Translation**: 1000 free translations per day per IP
+- **Supabase**: Free tier includes 500MB database, 2GB file storage, 50,000 monthly active users
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+No credit card or paid subscriptions needed to run the application!
 
-## How can I deploy this project?
+## 📚 Features
 
-Simply open [Lovable](https://lovable.dev/projects/8a6889a8-a8c3-4803-80ef-d430bee4a784) and click on Share -> Publish.
+### 🤖 AI Assistant
+- Context-aware responses using knowledge base
+- Emergency keyword detection in 6 languages
+- Automatic incident logging and severity assessment
+- Real-time streaming responses
 
-## Can I connect a custom domain to my Lovable project?
+### ✅ Recruiter Verification
+- Database of 95+ verified recruitment agencies
+- License number validation
+- Complaint tracking
+- Expiry date monitoring
 
-Yes, you can!
+### 🏢 Embassy Directory
+- Direct phone numbers and emergency hotlines
+- Working hours and addresses
+- Email contacts for all Uganda embassies
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+### 📖 Rights Education
+- Your basic rights as a migrant worker
+- Warning signs of trafficking
+- Emergency procedures
+- Contract rights and violations
+- Healthcare access information
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+### 🚨 Emergency Detection
+- Multi-language keyword detection
+- Automatic priority response
+- Incident report creation
+- Embassy contact provision
+
+## 🗂️ Project Structure
+
+```
+um-safe/
+├── src/
+│   ├── components/          # React components
+│   │   ├── LandingPage.tsx
+│   │   ├── AuthPage.tsx
+│   │   ├── SignUpPage.tsx
+│   │   ├── ChatInterface.tsx
+│   │   └── KnowledgeBasePanel.tsx
+│   ├── integrations/        # Supabase client
+│   └── pages/               # Route pages
+├── supabase/
+│   ├── functions/
+│   │   └── chat/            # AI chat edge function
+│   └── migrations/          # Database schema
+└── public/                  # Static assets
+```
+
+## 🌐 Deployment
+
+The application can be deployed to any static hosting service:
+- Vercel
+- Netlify
+- GitHub Pages
+- Supabase Hosting
+
+Ensure your Supabase edge functions are deployed before deploying the frontend.
+
+## 📄 License
+
+MIT License - See LICENSE file for details
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## 📞 Support
+
+For issues or questions, please open an issue on GitHub.
+
+## 🙏 Acknowledgments
+
+Built to protect and empower Ugandan migrant workers with technology and information.
